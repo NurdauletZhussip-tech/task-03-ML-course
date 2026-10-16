@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MOP 3231 · Task 3 — Midterm Project: from a dataset to a model</title>
+<style>
+  :root {
+    --navy: #1b2a4a;
+    --blue: #2f5fa8;
+    --blue-light: #eaf1fb;
+    --ink: #1f2430;
+    --muted: #5b6472;
+    --border: #d8dee8;
+    --code-bg: #f4f6fa;
+    --ok: #1f7a4d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #ffffff;
+    color: var(--ink);
+    font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.55;
+  }
+  .page {
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 48px 28px 80px;
+  }
+  header.masthead {
+    border-bottom: 3px solid var(--navy);
+    padding-bottom: 18px;
+    margin-bottom: 32px;
+  }
+  .kicker {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 12px;
+    color: var(--blue);
+    font-weight: 700;
+    margin: 0 0 6px;
+  }
+  h1 {
+    font-size: 27px;
+    margin: 0 0 8px;
+    color: var(--navy);
+    line-height: 1.25;
+  }
+  .meta {
+    color: var(--muted);
+    font-size: 13.5px;
+  }
+  .meta span:not(:last-child)::after {
+    content: "•";
+    margin: 0 8px;
+    color: var(--border);
+  }
+  h2 {
+    font-size: 18px;
+    color: var(--navy);
+    margin: 40px 0 6px;
+    padding-top: 4px;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+  h2 .step-no {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--blue);
+    color: #fff;
+    font-size: 12.5px;
+    font-weight: 700;
+    flex: none;
+  }
+  h2 .pts {
+    margin-left: auto;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--blue);
+    background: var(--blue-light);
+    border-radius: 999px;
+    padding: 2px 10px;
+    white-space: nowrap;
+  }
+  h3 { font-size: 14.5px; color: var(--navy); margin: 20px 0 6px; }
+  h3 .pts {
+    margin-left: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--blue);
+    background: var(--blue-light);
+    border-radius: 999px;
+    padding: 1px 9px;
+    white-space: nowrap;
+    vertical-align: 1px;
+  }
+  p { margin: 8px 0; }
+  .lead {
+    font-size: 15.5px;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  ul, ol { margin: 8px 0; padding-left: 22px; }
+  li { margin: 4px 0; }
+  code {
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    background: var(--code-bg);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    color: #b3261e;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--blue);
+    border-radius: 6px;
+    padding: 12px 14px;
+    overflow-x: auto;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    margin: 10px 0;
+  }
+  pre code {
+    background: none;
+    padding: 0;
+    color: var(--ink);
+  }
+  .platform-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--blue);
+    background: var(--blue-light);
+    border-radius: 4px;
+    padding: 2px 8px;
+    display: inline-block;
+    margin: 10px 0 4px;
+  }
+  .callout {
+    background: var(--blue-light);
+    border: 1px solid #c9dcf3;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin: 14px 0;
+    font-size: 14px;
+  }
+  .callout.note::before { content: "Note. "; font-weight: 700; color: var(--navy); }
+  .callout.check::before { content: "Checkpoint. "; font-weight: 700; color: var(--ok); }
+  .callout.scope::before { content: "Scope note. "; font-weight: 700; color: #8a5a00; }
+  .callout.scope { background: #fff8ea; border-color: #f0dca9; }
+  .callout.warn::before { content: "Read this twice. "; font-weight: 700; color: #8a5a00; }
+  .callout.warn { background: #fff8ea; border-color: #f0dca9; }
+  .callout.report::before { content: "Be ready to show. "; font-weight: 700; color: var(--navy); }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0;
+    font-size: 13.5px;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 7px 10px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: var(--blue-light); color: var(--navy); font-weight: 700; }
+  tfoot td { font-weight: 700; background: var(--code-bg); }
+  footer {
+    margin-top: 48px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  @media print {
+    body { font-size: 12px; }
+    .page { padding: 0; max-width: none; }
+    pre { break-inside: avoid; }
+    h2 { break-after: avoid; }
+  }
+  @media (prefers-color-scheme: dark) {
+    body { background: #14171f; color: #e4e7ee; }
+    .page { background: #14171f; }
+    header.masthead { border-bottom-color: #4c6fb3; }
+    h1, h2, h3 { color: #9db8ea; }
+    .meta, .lead, footer { color: #9aa2b2; }
+    code { background: #1f2430; color: #ff8a7a; }
+    pre { background: #1a1e28; border-color: #2b3140; }
+    pre code { color: #e4e7ee; }
+    .callout { background: #1c2740; border-color: #2c3f63; }
+    .callout.scope, .callout.warn { background: #2a2416; border-color: #4a3c1a; }
+    th { background: #1c2740; color: #9db8ea; }
+    th, td { border-color: #2b3140; }
+    tfoot td { background: #1a1e28; }
+    .platform-label, h2 .pts, h3 .pts { background: #1c2740; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="masthead">
+    <p class="kicker">MOP 3231 · Machine Learning (Python)</p>
+    <h1>Task 3 — Midterm Project: from a dataset to a model</h1>
+    <p class="meta">
+      <span>Weeks 1–6: the whole supervised pipeline (clustering, week 7, is not assessed)</span>
+      <span><strong>Graded — Task 3, 50 points, project with defence</strong></span>
+      <span>Due: Sunday 18 October 2026, 23:59 (Canvas time, UTC+5)</span>
+      <span>Instructor: Baubek Ukibassov</span>
+    </p>
+  </header>
+
+  <p class="lead">
+    In Tasks 1 and 2 the steps were laid out for you. Here they are not. You get a dataset and a business
+    question, and you hand in a trained model. Everything in between is yours to decide, do and defend:
+    what to look at, what to clean, what to compare, what to trust. This page gives you only the outline of
+    the pipeline and the rules for what you submit.
+  </p>
+
+  <div class="callout note">
+    <strong>The situation.</strong> A Portuguese bank phones its clients to sell a term deposit. The call
+    centre can phone only <strong>10 % of the clients on a list</strong> in one campaign wave. Your model
+    must rank the clients so that the 10 % who get a call are as likely as possible to say <em>yes</em>.
+    The scoring is done <em>before</em> any call is made.
+  </div>
+
+  <div class="callout note">
+    The data are the UCI <em>Bank Marketing</em> database, file <code>bank-additional-full.csv</code>
+    (Moro, Rita &amp; Cortez, 2014; CC BY 4.0): calls made between May 2008 and November 2010. It is a
+    teaching dataset; do not draw conclusions about real banks or real clients from it. After the
+    removal of 12 exact duplicate rows it was split at random into <strong>32 940 rows in
+    <code>train.csv</code></strong> (with the answer <code>y</code>, 11.3 % “yes”) and
+    <strong>8 236 rows in <code>test.csv</code></strong> (without the answer). The answers for
+    <code>test.csv</code> are kept by the instructor and are never shown.
+  </div>
+
+  <div class="callout note">
+    This is individual work. Use the <strong>last 4 digits of your student ID</strong> as your random seed
+    for every split and every random model, so that your numbers differ from a classmate's. The data are the
+    same for everyone, so identical notebooks will be looked at, and the defence (below) is where you show
+    that the work is yours. You are graded on method and on whether your conclusions follow from
+    <em>your</em> numbers.
+  </div>
+
+  <div class="callout scope">
+    Use what was taught in weeks 1–6: preprocessing, logistic regression, KNN, decision trees, random
+    forests, model evaluation, SVM. Clustering (week 7) is not part of this task. Models must come from
+    scikit-learn. You may read any documentation; the code you submit must be code you can explain.
+  </div>
+
+  <h2><span class="step-no">0</span>Starter repository and environment</h2>
+  <div class="callout note">
+    Starter repository: <a href="https://github.com/unreal-kz/task-03-ML-course">https://github.com/unreal-kz/task-03-ML-course</a>.
+    It holds <code>data/train.csv</code>, <code>data/test.csv</code>, <code>requirements.txt</code>, a
+    <code>README.md</code> with the licence and citation of the data, and a <code>.gitignore</code>. You do not push
+    to it: you make your own repository, as in Tasks 1 and 2. (Copies of the two CSV files are also in the Week 07
+    module in Canvas.)
+  </div>
+  <p>Download the repository as a ZIP, unzip it into <code>lastname_ML_task_3</code>, create the environment inside
+  it and install the pinned libraries:</p>
+  <span class="platform-label">macOS / Linux</span>
+  <pre><code>cd lastname_ML_task_3
+python3 -m venv .lastname_ML_task_3
+source .lastname_ML_task_3/bin/activate
+pip install -r requirements.txt</code></pre>
+  <span class="platform-label">Windows (PowerShell)</span>
+  <pre><code>cd lastname_ML_task_3
+python -m venv .lastname_ML_task_3
+.lastname_ML_task_3\Scripts\Activate.ps1
+pip install -r requirements.txt</code></pre>
+  <div class="callout warn">
+    Do not change the versions in <code>requirements.txt</code>. A saved model file only loads reliably under the
+    same <code>scikit-learn</code> version that created it, and the instructor loads your model with exactly these
+    versions. Work in a notebook called <code>lastname_task3.ipynb</code> in the root of the folder.
+  </div>
+
+  <h2><span class="step-no">1</span>Blueprint of the pipeline</h2>
+  <p>Eight stages. For each one, the questions you must be able to answer. How you answer them, with which
+  code and which plots, is your decision. There are no code snippets and no expected values in this handout.</p>
+
+  <h3>Stage 1 · Frame the problem <span class="pts">Framing &amp; EDA</span></h3>
+  <ul>
+    <li>What exactly is being predicted, for whom, and what does the 10 % call-centre capacity change about which metric
+    you should optimise?</li>
+    <li><code>test.csv</code> does not have the same columns as <code>train.csv</code>. Which differ, why, and what
+    does that mean for the model you are allowed to build?</li>
+  </ul>
+
+  <h3>Stage 2 · Understand the data <span class="pts">Framing &amp; EDA</span></h3>
+  <ul>
+    <li>How imbalanced is the target? What does a classifier that always answers “no” score on accuracy?</li>
+    <li>Which columns contain values that mean “missing” or “not applicable” rather than a real measurement? Count them.</li>
+    <li>What order are the rows in, what could that order mean, and does your split respect it?</li>
+    <li>Which features look related to the answer, and by how much? A plot without a number next to it does not count.</li>
+  </ul>
+
+  <h3>Stage 3 · Design the validation <span class="pts">Model selection</span></h3>
+  <ul>
+    <li>Put a hold-out of your own aside from <code>train.csv</code>, and do not touch it until the last stage.
+    Everything else (comparison, tuning) happens by cross-validation on the remaining part.</li>
+    <li>Which splitter, and why? How large is the spread between folds, and what does that spread say about differences
+    between models?</li>
+  </ul>
+
+  <h3>Stage 4 · Preprocess inside a pipeline <span class="pts">Preprocessing</span></h3>
+  <ul>
+    <li>Every step that learns something from data (filling, scaling, encoding) must be fitted on training folds only.
+    How do you guarantee that, and how would you show a reader that it holds?</li>
+    <li>Decide, per column type, how to encode it and how to treat the “missing” values you found. Justify at least one
+    decision with cross-validation numbers against an alternative.</li>
+    <li>The saved pipeline must accept the raw columns of <code>test.csv</code> with no manual step before it.</li>
+  </ul>
+
+  <h3>Stage 5 · Baselines <span class="pts">Baselines</span></h3>
+  <ul>
+    <li>A majority-class baseline and one simple model, on the same folds, with mean and standard deviation.
+    These are the bar every later model has to clear.</li>
+  </ul>
+
+  <h3>Stage 6 · Compare models and tune <span class="pts">Model selection</span></h3>
+  <ul>
+    <li>At least three different model families from the course, in the same pipeline, on the same folds.</li>
+    <li>Tune hyper-parameters by cross-validation on the training part only; state the search space you used.</li>
+    <li>Does handling the class imbalance help? Show the numbers with and without.</li>
+    <li>Which differences are larger than the fold spread, and which are not? Do not declare a winner inside the noise.</li>
+  </ul>
+
+  <h3>Stage 7 · Final evaluation, once <span class="pts">Final evaluation</span></h3>
+  <ul>
+    <li>Fit the chosen pipeline and score your own hold-out, once. Report ROC-AUC and average precision with their curves.</li>
+    <li>Turn the score into a decision with the capacity rule: choose the cutoff on your hold-out so that the top
+    10 % of clients are called. Report precision, recall and the lift over phoning clients at random, and read the
+    confusion matrix in plain language for the call-centre manager.</li>
+    <li>The split of this data is random, but the real use is “train on the past, call in the future”. Say in a few
+    sentences how this flatters your numbers.</li>
+  </ul>
+
+  <h3>Stage 8 · Save and describe the model <span class="pts">Submission, Reproducibility</span></h3>
+  <ul>
+    <li>Refit on all of <code>train.csv</code>, save the pipeline, and write the predictions for <code>test.csv</code>
+    (exact format in the next section).</li>
+    <li>Write <code>REPORT.md</code>, one to two pages, a model card: purpose, data, pipeline, metric and results, limits
+    and the ways it can fail in use, what you would monitor after launch.</li>
+  </ul>
+
+  <h2><span class="step-no">2</span>What you submit</h2>
+  <p>One link to <strong>Task 3 · Midterm Project</strong> in Canvas: the URL of the final commit in your GitHub
+  repository, for example <code>https://github.com/your-username/your-repo/commit/&lt;sha&gt;</code>. The Canvas
+  assignment takes a Website URL, not a file. The repository must contain, at that commit:</p>
+  <table>
+    <thead><tr><th>File</th><th>Requirement</th></tr></thead>
+    <tbody>
+      <tr><td><code>lastname_task3.ipynb</code></td><td>Executed, outputs visible, runs top to bottom (Restart &amp; Run All).</td></tr>
+      <tr><td><code>model.joblib</code></td><td>Written with <code>joblib.dump</code>. A fitted scikit-learn <code>Pipeline</code> whose first step accepts a DataFrame with the columns of <code>test.csv</code> except <code>id</code>, and which has <code>predict_proba</code> or <code>decision_function</code>. Under 50 MB.</td></tr>
+      <tr><td><code>predictions.csv</code></td><td>Columns <code>id, y_pred, y_score</code>, one row for every <code>id</code> in <code>test.csv</code>. <code>y_score</code>: the model's score, higher means more likely “yes”. <code>y_pred</code>: 1 for the clients you would call under the 10 % rule, otherwise 0.</td></tr>
+      <tr><td><code>REPORT.md</code></td><td>The model card from Stage 8.</td></tr>
+      <tr><td><code>requirements.txt</code>, <code>data/</code></td><td>As in the starter, unchanged versions.</td></tr>
+    </tbody>
+  </table>
+  <div class="callout warn">
+    The instructor loads <code>model.joblib</code> in a <strong>fresh Python process started in the root of your
+    repository</strong>. A function or class that you defined in a notebook cell is stored as “defined in
+    <code>__main__</code>” and will <strong>not</strong> load there. Build the pipeline from scikit-learn parts, or put
+    your helper code in a <code>.py</code> file in the repository root and import it in the notebook, so that the
+    pickle refers to that file. Test it before you submit: open a new terminal, activate the environment, run
+    <code>python -c "import joblib; joblib.load('model.joblib')"</code> in the repository folder, then score a few rows of
+    <code>test.csv</code>. If the model does not load, only <code>predictions.csv</code> can be used, and you lose
+    the points for a working model file.
+  </div>
+
+  <h3>Put your project on GitHub</h3>
+  <ol>
+    <li>On github.com create a new empty repository: no README, no .gitignore, no licence, because you already have your
+    own history. Private is fine. If it is private: <strong>Settings → Collaborators → Add people</strong>, and add
+    <strong>unreal-kz</strong> before the deadline. Without that the instructor sees a 404 and cannot grade the task.</li>
+    <li>Connect your local repository and push it:
+      <pre><code>git remote add origin https://github.com/your-username/your-repo.git
+git push -u origin main</code></pre></li>
+    <li>After your last commit run <code>git push</code>, open the repository on GitHub, click the latest commit, copy
+    the URL from the address bar and paste it into the Website URL box of the Canvas assignment.</li>
+  </ol>
+  <p>Submit the commit link, not just the repository address: it fixes exactly what your work looked like at that
+  commit. Commits pushed after the deadline are not graded. Make at least three commits as you go.</p>
+
+  <div class="callout note">
+    <strong>Hidden test.</strong> Your model and your <code>predictions.csv</code> are scored against the test
+    answers that only the instructor has. You see no leaderboard and no score before grading. The ROC-AUC on that set
+    decides two of the 50 points (see the table). Everything else is graded from your notebook, your report and your
+    defence, so building the model well matters more than squeezing the last 0.01 out of the test set.
+  </div>
+
+  <h2><span class="step-no">3</span>The defence</h2>
+  <p>After the deadline you defend the project in person, one student at a time. You will be asked to walk through
+  your pipeline without reading the notebook line by line, to explain a result and say whether it is inside the
+  noise, and to make a small change live (for example a different cutoff, a different metric, or one feature
+  removed), saying what you expect to happen <em>before</em> you run it. The instructor announces the schedule
+  in Canvas. A submission without a defence cannot receive the defence points, and a defence that shows the work
+  is not yours can change the points given for the other parts.</p>
+
+  <h2><span class="step-no">4</span>Grading — 50 points</h2>
+  <table>
+    <thead><tr><th>Part</th><th>Pts</th><th>Full marks require</th></tr></thead>
+    <tbody>
+      <tr><td>1 · Framing &amp; EDA</td><td>5</td><td>the business question and the 10 % capacity rule restated in your own words, with the metric chosen and why (1); the difference between the train and test columns explained, with its consequence for the model (2); class balance, “missing” values and the sentinel measured with counts (1); at least two plots with a numeric observation each (1)</td></tr>
+      <tr><td>2 · Preprocessing</td><td>8</td><td>every fitted step inside a Pipeline and fitted on training folds only, with the evidence shown (3); the “missing” values and the sentinel each handled with a stated reason (2); one preprocessing choice compared with an alternative using cross-validation numbers (1); the saved pipeline accepts the raw test.csv columns with no manual step (2)</td></tr>
+      <tr><td>3 · Baselines</td><td>4</td><td>majority-class baseline and one simple model on the same folds, with mean and standard deviation (2); accuracy shown to be misleading on these data, using the majority-class number (1); the baseline results used later as the bar for every candidate (1)</td></tr>
+      <tr><td>4 · Model selection</td><td>10</td><td>at least three different model families, each in the same pipeline and on the same stratified folds (3); the metric computed per fold, with mean and standard deviation, and the choice made with the spread taken into account (2); hyper-parameters tuned by cross-validation on the training part only, with the search space stated (2); class-imbalance handling compared with doing nothing, with numbers (1); a conclusion that declares no winner on a difference inside the fold spread (2)</td></tr>
+      <tr><td>5 · Final evaluation</td><td>6</td><td>own hold-out used once, after all choices are made (1); ROC and precision-recall curves, labelled, with AUC and average precision (1); the cutoff set by the 10 % rule on the hold-out, with precision, recall and lift over calling at random (2); the confusion matrix read in plain language for the call centre (1); an honest statement of how the random split flatters the result (1)</td></tr>
+      <tr><td>6 · Submission</td><td>5</td><td>model.joblib loads in a fresh process from the repository root and scores the raw test.csv (2); predictions.csv has the required columns, every id, 0/1 y_pred and numeric y_score, and agrees with the model (1); ROC-AUC on the hidden test set of at least 0.77 (2) or from 0.70 to below 0.77 (1)</td></tr>
+      <tr><td>7 · Reproducibility</td><td>2</td><td>versions printed, SEED stated, notebook runs top to bottom with outputs saved (1); REPORT.md, requirements.txt, the data and at least three commits are in the repository at the submitted commit (1)</td></tr>
+      <tr><td>8 · Defence</td><td>10</td><td>explains the pipeline end to end without reading the notebook (3); answers questions on the choices made and says which result is inside the noise (3); makes a requested change live and predicts the outcome before running it (2); describes at least two ways the model could fail in use (2)</td></tr>
+    </tbody>
+    <tfoot><tr><td>Total</td><td>50</td><td>&nbsp;</td></tr></tfoot>
+  </table>
+
+  <footer>
+    MOP 3231 · Machine Learning (Python) — Narxoz University ·
+    4 contact + 6 SSS + 2 SSSL hours ·
+    Instructor contact: baubek.ukibassov@narxoz.kz
+  </footer>
+</div>
+</body>
+</html>

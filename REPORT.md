@@ -1,126 +1,77 @@
-# Model card: Bank Marketing subscription ranking
+# Bank Marketing: subscription ranking
 
-## Purpose
+## Objective and data
 
-Rank clients by estimated probability of subscribing to a term deposit before a campaign call. Campaign capacity is
-limited to the top 10% of the client list; Precision@10% is the primary selection metric.
+The bank can call only 10% of the clients, so the goal is to rank clients by their likelihood of subscribing and
+prioritise the highest-scoring tenth. The primary metric is Precision@10%: the share of subscribers in that call
+list. Overall accuracy is secondary because the target is imbalanced.
 
-The practical objective is to use the limited call list on the clients most likely to subscribe. Since only one client
-in ten can be called, ranking quality in that top decile matters more operationally than overall accuracy; hence
-Precision@10% is the primary metric.
+`data/train.csv` has 32,940 rows and `data/test.csv` has 8,236. Training outcomes are 29,229 `no` and 3,711 `yes`
+(11.27% positive). Train has `y` and `duration`, while test has neither: `y` is the label, and `duration` is only
+known after a call. The model therefore excludes both from predictors; `id` is used only to match submission rows.
+Train has no actual missing predictor values. Literal `unknown` counts are job 275, marital 64, education 1,401,
+default 6,871, housing 794 and loan 794. `pdays == 999` occurs in 31,694 rows (96.22%); this sentinel means no
+previous contact and is treated as a category.
 
-## Data
+EDA finds cellular's observed subscription rate is 14.70%, versus 5.26% for telephone (association, not causation).
+Duration is strongly associated with outcome, but is post-call information: median duration is 164 seconds for
+`no` and 449 seconds for `yes`; the observed yes rate ranges from 0.03% in the shortest duration decile to 46.03%
+in the longest. As a leakage diagnostic only, adding duration to the same development folds raises Precision@10%
+from 0.4880 ± 0.0236 to 0.6086 ± 0.0202 and ROC AUC from 0.7890 ± 0.0084 to 0.9363 ± 0.0043. These inflated
+scores are not candidate results: duration is unavailable at decision time and absent from test.
 
-The model is developed with `data/train.csv`. The target is `y` (`yes` is positive). `id` is retained only for
-submission matching and is not a predictor. `duration` is excluded because it is unavailable before a call and absent
-from `test.csv`. The pipeline receives the raw test predictors without manual preprocessing.
+## Preprocessing and model selection
 
-The training set has 32,940 rows and the test set has 8,236. There are 29,229 `no` and 3,711 `yes` outcomes
-(positive share 0.1127). Train has `duration` and `y`, which test lacks: `y` supplies training labels, while
-`duration` cannot be used for pre-call scoring and is excluded to avoid leakage. `id` is kept for output matching,
-not as a predictor. Literal `unknown` counts are: job 275, marital 64, education 1,401, default 6,871, housing
-794, and loan 794; the predictors contain zero actual NaNs. The `pdays == 999` sentinel appears in 31,694 training
-rows (0.9622 share).
+All fitted preprocessing is inside the sklearn pipeline and therefore learned within each training fold. Numeric
+columns use median imputation and standard scaling; categorical columns use most-frequent imputation and one-hot
+encoding. Literal `unknown` is retained as a category. In five stratified development folds, treating `unknown`
+as missing and imputing the mode gives Precision@10% 0.4888 ± 0.0235 versus 0.4880 ± 0.0236 when retained;
+the 0.0008 difference is small relative to fold variability. `pdays` is categorical, preserving 999 as its own
+one-hot category; no separate contact flag is used because it duplicates that signal. The saved pipeline accepts
+the raw test DataFrame and ignores `id`.
 
-Duration is recorded during the call, so it is not available when deciding whom to call. It is strongly associated
-with the eventual outcome: median duration is 164 seconds for `no` and 449 seconds for `yes`. Across duration
-deciles from shortest to longest, the observed `yes` rate rises from 0.03% to 46.03%. This is post-outcome
-information, not a usable pre-call signal.
-
-The `unknown` values represent unavailable or unspecified client information, not invalid observations, so rows are
-kept and `unknown` remains its own category. `pdays == 999` is a sentinel for no prior contact, not a real elapsed-day
-measurement; it is one-hot encoded as its own category. A separate `was_contacted` flag was omitted because it
-duplicates the information already represented by this category. The observed positive rate is 14.70% for
-cellular and 5.26% for telephone contacts, an association in this dataset rather than evidence that channel causes
-the difference. A random split can put records from similar campaign periods and macroeconomic conditions on both
-sides; a future campaign may have a different channel mix, response prevalence, or economic environment, so random
-holdout results may be optimistic for deployment.
-
-## Pipeline and evaluation
-
-Numeric features use median imputation and standard scaling. Categorical features use most-frequent imputation and
-one-hot encoding; literal `unknown` values remain categories. `pdays` is treated categorically, so its 999 sentinel
-is represented as its own category. All transformations are fitted inside the scikit-learn pipeline; no project
-Python module is required to load the saved model. A CV comparison of retaining `unknown` as a category versus
-imputing it to the most frequent category gave Precision@10% of 0.4880 ± 0.0236 and 0.4888 ± 0.0235, respectively.
-
-To quantify why `duration` must be excluded, the same five development folds were also run as a leakage diagnostic
-with `duration` added as a numeric input. Precision@10% rose from 0.4880 ± 0.0236 to 0.6086 ± 0.0202, and ROC AUC
-from 0.7890 ± 0.0084 to 0.9363 ± 0.0043. These inflated figures are not candidate-model results: this feature is
-unavailable at decision time and absent from test.
-
-The notebook compares the prior majority baseline, logistic regression, decision tree, and random forest on the same
-five stratified outer folds; small parameter grids are tuned inside each outer training fold. Results:
-
-The majority-prior baseline is the reference floor for every ranking candidate, not an accuracy target: its scores are tied,
-so Precision@10% is near prevalence. Search spaces: logistic regression `C ∈ {0.1, 1.0, 10.0}`, both balanced
-and unweighted; balanced decision tree `max_depth ∈ {6, 10, None}` with `min_samples_leaf=5`; random forest
-`n_estimators=60`, `min_samples_leaf ∈ {3, 5, 10}`, compared with and without balanced class weights. Inner tuning
-uses three stratified folds; outer comparisons use five.
+Candidate comparisons use the same five stratified outer folds; hyperparameters are searched only by three-fold CV
+inside each outer training fold. The prior majority classifier is the ranking baseline and minimum bar for every
+candidate. Its high accuracy (0.8873) is misleading: Precision@10% is only 0.1069, near prevalence, and tied scores
+cannot meaningfully rank clients.
 
 | Model | Precision@10% | ROC AUC | Average precision | Accuracy |
 |---|---:|---:|---:|---:|
-| Majority baseline (prior) | 0.1069 ± 0.0075 | 0.5000 ± 0.0000 | 0.1127 ± 0.0001 | 0.8873 ± 0.0001 |
-| Logistic regression (balanced) | 0.4877 ± 0.0240 | 0.7889 ± 0.0085 | 0.4362 ± 0.0177 | 0.8288 ± 0.0109 |
-| Logistic regression (no class weights) | 0.4907 ± 0.0154 | 0.7891 ± 0.0088 | 0.4389 ± 0.0167 | 0.8987 ± 0.0030 |
-| Decision tree (balanced) | 0.4945 ± 0.0152 | 0.7805 ± 0.0082 | 0.4132 ± 0.0176 | 0.8394 ± 0.0229 |
-| Random forest (no class weights) | 0.5040 ± 0.0166 | 0.7874 ± 0.0059 | 0.4547 ± 0.0129 | 0.8986 ± 0.0022 |
-| Random forest (balanced) | 0.4994 ± 0.0188 | 0.7914 ± 0.0110 | 0.4530 ± 0.0214 | 0.8654 ± 0.0041 |
+| Majority prior baseline | 0.1069 ± 0.0075 | 0.5000 ± 0.0000 | 0.1127 ± 0.0001 | 0.8873 ± 0.0001 |
+| Logistic regression, balanced | 0.4877 ± 0.0240 | 0.7889 ± 0.0085 | 0.4362 ± 0.0177 | 0.8288 ± 0.0109 |
+| Logistic regression, unweighted | 0.4907 ± 0.0154 | 0.7891 ± 0.0088 | 0.4389 ± 0.0167 | 0.8987 ± 0.0030 |
+| Decision tree, balanced | 0.4945 ± 0.0152 | 0.7805 ± 0.0082 | 0.4132 ± 0.0176 | 0.8394 ± 0.0229 |
+| Random forest, unweighted | 0.5040 ± 0.0166 | 0.7874 ± 0.0059 | 0.4547 ± 0.0129 | 0.8986 ± 0.0022 |
+| Random forest, balanced | 0.4994 ± 0.0188 | 0.7914 ± 0.0110 | 0.4530 ± 0.0214 | 0.8654 ± 0.0041 |
 
-The majority baseline reaches 0.8873 accuracy by predicting the common class, but its Precision@10% is only 0.1069,
-close to the positive prevalence; its tied scores cannot rank clients meaningfully. This makes its Precision@10%
-the baseline floor for the other models. For logistic regression, balanced weighting gives 0.4877 ± 0.0240 versus
-0.4907 ± 0.0154 without weights. The random-forest comparison is 0.4994 ± 0.0188 (balanced) versus
-0.5040 ± 0.0166 (unweighted). These differences are small relative to the combined fold spreads and do not show a
-clear benefit from class weighting. The highest mean is random forest without class weights; its Precision@10%
-advantage over balanced logistic regression is 0.0163, below their combined fold spread of about 0.0292. There is
-no robust winner on these folds. The notebook selects the simpler logistic model rather than claiming a robust
-nonlinear-model win. Its selected regularization parameter is `C=1.0`.
+Search spaces: logistic regression `C ∈ {0.1, 1, 10}` with and without class weights; balanced decision tree
+`max_depth ∈ {6, 10, None}`, `min_samples_leaf=5`; random forest with 60 trees and
+`min_samples_leaf ∈ {3, 5, 10}`, both balanced and unweighted. Weighting does not show a clear benefit:
+logistic balanced versus unweighted is 0.4877 versus 0.4907; random forest is 0.4994 versus 0.5040. The best
+mean is the unweighted forest, but its 0.0163 Precision@10% gain over balanced logistic regression is smaller
+than the combined fold spread (~0.0292). There is no robust winner; the simpler balanced logistic model
+(`C=1.0`) is selected.
 
-For unknown handling, keeping `unknown` as a category and imputing it to the most frequent category give nearly
-identical mean Precision@10% (0.4880 vs 0.4888), with fold spreads overlapping substantially (0.0236 and 0.0235).
-Precision@10% depends only on the ordering of the top tenth, so this close result means the two treatments produced
-similar top-decile rankings in these folds; it does not imply identical probabilities or features. Retaining
-`unknown` is a reasonable semantic choice because unavailable information may itself carry signal.
+## Final evaluation and submission
 
-The reserved holdout was scored once after model selection. Results: ROC AUC 0.8036, average precision 0.4884,
-10%-capacity threshold 0.7851, Precision@10% 0.5341, recall 0.4744, and lift over random calls 4.7425. The confusion
-matrix (true rows 0/1, predicted columns 0/1) is `[[5539, 307], [390, 352]]`. The final pipeline is refit on all
-labelled training rows and saved as `model.joblib`. `predictions.csv` has columns `id, y_pred, y_score` for all
-8,236 test rows; exactly 824 rows (ceil of 10% capacity) are marked `yes` by ranking the full-training model's
-scores. The holdout-derived threshold is reported for holdout analysis only and is not used to form the test call
-list. Of the 659 holdout calls, 307 were false-positive calls that did not result in a subscription; 390 subscribers
-were not reached. The test labels are not supplied, so hidden-test ROC-AUC cannot be calculated locally.
+After model choices, the reserved holdout was evaluated once. ROC AUC is 0.8036, average precision 0.4884,
+Precision@10% 0.5341, recall 0.4744 and lift over random calling 4.7425. The 10% holdout rule selected 659
+clients. Of these, 352 subscribed and 307 were false-positive calls; a further 390 subscribers were not reached.
+The random stratified split may flatter future performance because train and holdout can share campaign periods
+and economic conditions; a future campaign may differ.
 
-## Reproducibility and repository contents
+The final pipeline is refit on all labelled training data and saved as `model.joblib`. In a fresh Python process,
+it loads and scores the raw `data/test.csv` DataFrame. Root `predictions.csv` has columns `id, y_pred, y_score`,
+all 8,236 test IDs, model-matching scores and exactly 824 positive call labels (ceil of 10% capacity). Hidden-test
+AUC cannot be calculated locally because test labels are withheld.
 
-The notebook prints Python, NumPy, pandas, scikit-learn and joblib versions and sets `SEED = 2729`; pinned
-dependencies are in `requirements.txt`. The executed notebook contains saved outputs, and the fitted artifact is
-loadable in a fresh Python process without project-specific helper modules. The repository inventory includes
-`zhussip_task3.ipynb`, `REPORT.md`, `requirements.txt`, `model.joblib`, `data/train.csv`, `data/test.csv`, and
-`predictions.csv`. At review time, `git log` showed at least three commits (latest: `f86a491`, `9178216`,
-`7d43707`), meeting the handout's minimum-history requirement. The latest notebook and regenerated root
-`predictions.csv` changes still need to be included in the final submitted commit.
+## Reproducibility and limitations
 
-## Limitations, failure modes, and monitoring
+The notebook prints Python and library versions, sets `SEED = 2729`, and runs top-to-bottom with saved outputs.
+`requirements.txt` pins dependencies. The repository includes the notebook, report, requirements, model, train/test
+data and root submission file; git history contains at least three commits. The latest notebook and submission
+updates must be included in the final submitted commit.
 
-The ranking may degrade if campaign timing, macroeconomic conditions, channel mix, or client composition changes; it
-may also fail if input definitions or the prevalence/meaning of `unknown` values change. Validate feature schemas
-and monitor feature drift, unknown rates, `pdays` sentinel share, score distributions, and the realised top-decile
-call-list size. Once outcomes mature, monitor response prevalence, Precision@10%, recall, lift, ROC AUC, and average
-precision by campaign period and channel; review drift before retraining or recalibrating. The supplied test set has
-no labels, so its ROC AUC cannot be calculated locally.
-
-## Defence preparation
-
-Walk through the pipeline without reading cells: reserve a stratified holdout; fit imputation, scaling and encoding
-inside CV; tune models only inside outer training folds; compare top-decile Precision@10%; select the simpler model
-when gains are within fold variability; evaluate once on holdout; refit on all labelled rows; rank test rows within
-the 10% call capacity. The saved pipeline accepts the unmodified `test.csv` DataFrame and ignores `id`.
-
-The `unknown` alternative changed mean Precision@10% by 0.0008 against a combined fold spread of 0.0333. The top
-random forest led balanced logistic regression by 0.0163 against a combined spread of about 0.0292. For a live
-change, reducing logistic `C` from 1.0 to 0.1 should shrink coefficients but may alter the call ranking; predict
-that the metric can move either way, then compare with the same CV rather than claiming improvement in advance.
-Deployment failure modes include campaign/economic drift and changed input schemas or `unknown` rates; monitor those
-and the `pdays` sentinel share.
+Performance may degrade under campaign/economic drift, changed client mix, or changes to the input schema and
+`unknown` rates. Monitor those distributions, the `pdays` sentinel share, score distribution and realised call-list
+size; once outcomes arrive, track Precision@10%, lift, ROC AUC and average precision over time.
