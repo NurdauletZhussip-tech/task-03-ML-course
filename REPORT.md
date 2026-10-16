@@ -6,17 +6,26 @@ The bank can call only 10% of the clients, so the goal is to rank clients by the
 prioritise the highest-scoring tenth. The primary metric is Precision@10%: the share of subscribers in that call
 list. Overall accuracy is secondary because the target is imbalanced.
 
-`data/train.csv` has 32,940 rows and `data/test.csv` has 8,236. Training outcomes are 29,229 `no` and 3,711 `yes`
-(11.27% positive). Train has `y` and `duration`, while test has neither: `y` is the label, and `duration` is only
-known after a call. The model therefore excludes both from predictors; `id` is used only to match submission rows.
-Train has no actual missing predictor values. Literal `unknown` counts are job 275, marital 64, education 1,401,
-default 6,871, housing 794 and loan 794. `pdays == 999` occurs in 31,694 rows (96.22%); this sentinel means no
-previous contact and is treated as a category.
+`data/train.csv` has 32,940 rows and `data/test.csv` has 8,236. A stratified 80/20 split is made immediately after
+loading the labelled training file, before supervised EDA, preprocessing comparisons or model selection. The
+development part has 26,352 rows: 23,383 `no` and 2,969 `yes` (11.27% positive); the 6,588-row holdout is reserved
+until final evaluation. Train has `y` and `duration`, while test has neither: `y` is the label, and `duration` is
+only known after a call. The model therefore excludes both from predictors; `id` is used only to match submission
+rows.
 
-EDA finds cellular's observed subscription rate is 14.70%, versus 5.26% for telephone (association, not causation).
-Duration is strongly associated with outcome, but is post-call information: median duration is 164 seconds for
-`no` and 449 seconds for `yes`; the observed yes rate ranges from 0.03% in the shortest duration decile to 46.03%
-in the longest. As a leakage diagnostic only, adding duration to the same development folds raises Precision@10%
+EDA below uses development data only. Its predictors have no actual NaN values. Literal `unknown` counts are job
+216, marital 54, education 1,138, default 5,477, housing 625 and loan 625. `pdays == 999` occurs in 25,367 of
+26,352 development rows (96.26%); this sentinel means no previous contact and is treated as a category.
+
+The observed IDs increase monotonically within each file (train 0–32,939; test 32,940–41,175), but `id` is a
+synthetic identifier, not a date. There are no date/time/year columns, so row order cannot be interpreted as
+chronology or used for a train-on-past/test-on-future split. The train/test schema difference is `y` and
+`duration`, both absent from test; no hidden test labels or test-based model selection are used.
+
+In development, cellular's observed subscription rate is 14.64%, versus 5.38% for telephone (association, not
+causation). Duration is strongly associated with outcome, but is post-call information: median duration is 163
+seconds for `no` and 450 seconds for `yes`; the observed yes rate ranges from 0.04% in the shortest duration decile
+to 46.15% in the longest. As a leakage diagnostic only, adding duration to the same development folds raises Precision@10%
 from 0.4880 ± 0.0236 to 0.6086 ± 0.0202 and ROC AUC from 0.7890 ± 0.0084 to 0.9363 ± 0.0043. These inflated
 scores are not candidate results: duration is unavailable at decision time and absent from test.
 
@@ -54,7 +63,8 @@ than the combined fold spread (~0.0292). There is no robust winner; the simpler 
 
 ## Final evaluation and submission
 
-After model choices, the reserved holdout was evaluated once. ROC AUC is 0.8036, average precision 0.4884,
+After model choices, the reserved 6,588-row holdout was evaluated once. It contains 5,846 `no` and 742 `yes`.
+ROC AUC is 0.8036, average precision 0.4884,
 Precision@10% 0.5341, recall 0.4744 and lift over random calling 4.7425. The 10% holdout rule selected 659
 clients. Of these, 352 subscribed and 307 were false-positive calls; a further 390 subscribers were not reached.
 The random stratified split may flatter future performance because train and holdout can share campaign periods
